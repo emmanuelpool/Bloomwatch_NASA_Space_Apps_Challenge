@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BloomWatch - Global Flowering Phenology</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', 'Helvetica', sans-serif;
+            background: #1a1a1a;
+            color: #ffffff;
+            overflow: hidden;
+        }
+
+        .header {
+            background: #0a0a0a;
+            padding: 20px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            position: relative;
+            z-index: 1000;
+        }
+
+        .logo {
+            font-size: 1.1em;
+            font-weight: 400;
+            letter-spacing: 1px;
+            color: #ffffff;
+            max-width: 70%;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+
+        .logo:hover {
+            color: #4a9eff;
+        }
+
+        .logo span {
+            color: #4a9eff;
+            font-weight: 300;
+            font-size: 0.9em;
+        }
+
+        .menu-btn {
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .menu-btn span {
+            width: 30px;
+            height: 3px;
+            background: #ffffff;
+            transition: all 0.3s;
+        }
+
+        .sidebar {
+            position: fixed;
+            right: -400px;
+            top: 0;
+            width: 400px;
+            height: 100vh;
+            background: #0f0f0f;
+            box-shadow: -5px 0 20px rgba(0,0,0,0.5);
+            transition: right 0.4s ease;
+            z-index: 2000;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+
+        .sidebar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .sidebar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        .sidebar.active {
+            right: 0;
+        }
+
+        .sidebar-header {
+            padding: 25px;
+            background: #050505;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #333;
+        }
+
+        .sidebar-header h2 {
+            font-size: 1.3em;
+            font-weight: 400;
+            letter-spacing: 1px;
+        }
+
+        .close-btn {
+            background: transparent;
+            border: none;
+            color: #fff;
+            font-size: 2em;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+        }
+
+        .continent-section {
+            border-bottom: 1px solid #2a2a2a;
+        }
+
+        .continent-btn {
+            width: 100%;
+            background: transparent;
+            border: none;
+            color: #fff;
+            padding: 20px 25px;
+            text-align: left;
+            font-size: 1.1em;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.3s;
+        }
+
+        .continent-btn:hover {
+            background: #1a1a1a;
+        }
+
+        .continent-btn::after {
+            content: '▶';
+            transition: transform 0.3s;
+            font-size: 0.8em;
+            color: #4a9eff;
+        }
+
+        .continent-btn.active::after {
+            transform: rotate(90deg);
+        }
+
+        .countries-list {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s ease;
+            background: #0a0a0a;
+        }
+
+        .countries-list.active {
+            max-height: 500px;
+        }
+
+        .country-item {
+            padding: 15px 25px 15px 45px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border-left: 3px solid transparent;
+        }
+
+        .country-item:hover {
+            background: #1a1a1a;
+            border-left-color: #4a9eff;
+            padding-left: 50px;
+        }
+
+        .search-box {
+            padding: 25px;
+            border-bottom: 1px solid #2a2a2a;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 12px 15px;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            color: #fff;
+            font-size: 1em;
+            border-radius: 5px;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: #4a9eff;
+        }
+
+        #map {
+            height: 100vh;
+            width: 100%;
+        }
+
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            display: none;
+            z-index: 1500;
+        }
+
+        .overlay.active {
+            display: block;
+        }
+
+        .construction-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #0f0f0f;
+            padding: 50px;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 3000;
+            display: none;
+            border: 1px solid #333;
+            box-shadow: 0 10px 50px rgba(0,0,0,0.8);
+        }
+
+        .construction-modal.active {
+            display: block;
+        }
+
+        .construction-modal h2 {
+            font-size: 2em;
+            margin-bottom: 20px;
+            color: #4a9eff;
+            font-weight: 300;
+        }
+
+        .construction-modal p {
+            color: #999;
+            font-size: 1.1em;
+            margin-bottom: 30px;
+        }
+
+        .close-modal-btn {
+            background: #4a9eff;
+            color: #fff;
+            border: none;
+            padding: 12px 30px;
+            font-size: 1em;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background 0.3s;
+        }
+
+        .close-modal-btn:hover {
+            background: #3a8eef;
+        }
+
+        .saskatchewan-panel {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #0f0f0f;
+            padding: 30px;
+            border-radius: 10px;
+            z-index: 1000;
+            display: none;
+            border: 1px solid #333;
+            box-shadow: 0 5px 30px rgba(0,0,0,0.8);
+            max-width: 90%;
+        }
+
+        .saskatchewan-panel.active {
+            display: block;
+        }
+
+        .saskatchewan-panel h3 {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+            font-weight: 400;
+            color: #4a9eff;
+        }
+
+        .region-panel {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #0f0f0f;
+            padding: 30px;
+            border-radius: 10px;
+            z-index: 1001;
+            display: none;
+            border: 1px solid #333;
+            box-shadow: 0 5px 30px rgba(0,0,0,0.8);
+            max-width: 90%;
+        }
+
+        .region-panel.active {
+            display: block;
+        }
+
+        .region-panel h3 {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+            font-weight: 400;
+            color: #4a9eff;
+        }
+
+        .panel-close-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: transparent;
+            border: none;
+            color: #999;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 5px 10px;
+            line-height: 1;
+            transition: color 0.3s;
+        }
+
+        .panel-close-btn:hover {
+            color: #fff;
+        }
+
+        .zones-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+        }
+
+        .zone-btn {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            color: #fff;
+            padding: 15px 10px;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: all 0.3s;
+            text-align: center;
+        }
+
+        .zone-btn:hover {
+            background: #2a2a2a;
+            border-color: #4a9eff;
+            transform: translateY(-3px);
+        }
+
+        .info-button {
+            position: fixed;
+            top: 90px;
+            left: 20px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: #0a0a0a;
+            border: 2px solid #4a9eff;
+            color: #4a9eff;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 3px 10px rgba(74, 158, 255, 0.4);
+            transition: all 0.3s;
+            z-index: 1001;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .info-button:hover {
+            background: #1a1a1a;
+            border-color: #5aafff;
+            color: #5aafff;
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(74, 158, 255, 0.6);
+        }
+
+        .alert-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #0f0f0f;
+            padding: 40px;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 3000;
+            display: none;
+            border: 2px solid #4a9eff;
+            box-shadow: 0 10px 50px rgba(74, 158, 255, 0.3);
+            min-width: 400px;
+        }
+
+        .alert-modal.active {
+            display: block;
+        }
+
+        .alert-modal h2 {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            color: #4a9eff;
+            font-weight: 400;
+        }
+
+        .alert-modal p {
+            color: #fff;
+            font-size: 1.1em;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+
+        .alert-btn {
+            background: #4a9eff;
+            color: #fff;
+            border: none;
+            padding: 12px 30px;
+            font-size: 1em;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background 0.3s;
+            margin: 0 10px;
+        }
+
+        .alert-btn:hover {
+            background: #3a8eef;
+        }
+
+        .alert-btn.secondary {
+            background: #2a2a2a;
+        }
+
+        .alert-btn.secondary:hover {
+            background: #3a3a3a;
+        }
+
+        .loading-indicator {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(15, 15, 15, 0.95);
+            padding: 30px 50px;
+            border-radius: 10px;
+            border: 2px solid #4a9eff;
+            z-index: 3001;
+            display: none;
+        }
+
+        .loading-indicator.active {
+            display: block;
+        }
+
+        .loading-indicator p {
+            color: #4a9eff;
+            font-size: 1.2em;
+            text-align: center;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                right: -100%;
+            }
+
+            .zones-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo" onclick="goHome()">Beaners: <span>An Earth Observation Application for Global Flowering Phenology</span></div>
+        <button class="menu-btn" onclick="toggleSidebar()">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+    </div>
+
+    <div id="map"></div>
+
+    <button class="info-button" onclick="showAlert()">!</button>
+
+    <div class="loading-indicator" id="loadingIndicator">
+        <p>⏳ Loading satellite data...</p>
+    </div>
+
+    <div class="overlay" id="overlay" onclick="closeAll()"></div>
+
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h2>Select Region</h2>
+            <button class="close-btn" onclick="toggleSidebar()">&times;</button>
+        </div>
+
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="Search country..." onkeyup="searchCountry(event)">
+        </div>
+
+        <div class="continent-section">
+            <button class="continent-btn" onclick="toggleContinent('africa')">Africa</button>
+            <div class="countries-list" id="africa">
+                <div class="country-item" onclick="selectCountry('South Africa')">South Africa</div>
+                <div class="country-item" onclick="selectCountry('Nigeria')">Nigeria</div>
+                <div class="country-item" onclick="selectCountry('Kenya')">Kenya</div>
+                <div class="country-item" onclick="selectCountry('Egypt')">Egypt</div>
+                <div class="country-item" onclick="selectCountry('Morocco')">Morocco</div>
+                <div class="country-item" onclick="selectCountry('Ethiopia')">Ethiopia</div>
+            </div>
+        </div>
+
+        <div class="continent-section">
+            <button class="continent-btn" onclick="toggleContinent('asia')">Asia</button>
+            <div class="countries-list" id="asia">
+                <div class="country-item" onclick="selectCountry('China')">China</div>
+                <div class="country-item" onclick="selectCountry('India')">India</div>
+                <div class="country-item" onclick="selectCountry('Japan')">Japan</div>
+                <div class="country-item" onclick="selectCountry('South Korea')">South Korea</div>
+                <div class="country-item" onclick="selectCountry('Thailand')">Thailand</div>
+                <div class="country-item" onclick="selectCountry('Indonesia')">Indonesia</div>
+            </div>
+        </div>
+
+        <div class="continent-section">
+            <button class="continent-btn" onclick="toggleContinent('europe')">Europe</button>
+            <div class="countries-list" id="europe">
+                <div class="country-item" onclick="selectCountry('Spain')">Spain</div>
+                <div class="country-item" onclick="selectCountry('France')">France</div>
+                <div class="country-item" onclick="selectCountry('Germany')">Germany</div>
+                <div class="country-item" onclick="selectCountry('Italy')">Italy</div>
+                <div class="country-item" onclick="selectCountry('United Kingdom')">United Kingdom</div>
+                <div class="country-item" onclick="selectCountry('Netherlands')">Netherlands</div>
+            </div>
+        </div>
+
+        <div class="continent-section">
+            <button class="continent-btn" onclick="toggleContinent('northamerica')">North America</button>
+            <div class="countries-list" id="northamerica">
+                <div class="country-item" onclick="selectCountry('United States')">United States</div>
+                <div class="country-item" onclick="selectCountry('Mexico')">Mexico</div>
+                <div class="country-item" onclick="selectCountry('Canada')">Canada</div>
+                <div class="country-item" onclick="selectCountry('Guatemala')">Guatemala</div>
+                <div class="country-item" onclick="selectCountry('Cuba')">Cuba</div>
+            </div>
+        </div>
+
+        <div class="continent-section">
+            <button class="continent-btn" onclick="toggleContinent('southamerica')">South America</button>
+            <div class="countries-list" id="southamerica">
+                <div class="country-item" onclick="selectCountry('Brazil')">Brazil</div>
+                <div class="country-item" onclick="selectCountry('Argentina')">Argentina</div>
+                <div class="country-item" onclick="selectCountry('Chile')">Chile</div>
+                <div class="country-item" onclick="selectCountry('Colombia')">Colombia</div>
+                <div class="country-item" onclick="selectCountry('Peru')">Peru</div>
+            </div>
+        </div>
+
+        <div class="continent-section">
+            <button class="continent-btn" onclick="toggleContinent('oceania')">Oceania</button>
+            <div class="countries-list" id="oceania">
+                <div class="country-item" onclick="selectCountry('Australia')">Australia</div>
+                <div class="country-item" onclick="selectCountry('New Zealand')">New Zealand</div>
+                <div class="country-item" onclick="selectCountry('Papua New Guinea')">Papua New Guinea</div>
+                <div class="country-item" onclick="selectCountry('Fiji')">Fiji</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="construction-modal" id="constructionModal">
+        <h2>Region Under Development</h2>
+        <p>Bloom monitoring data for this region is currently being processed.</p>
+        <button class="close-modal-btn" onclick="closeModal()">Close</button>
+    </div>
+
+    <div class="alert-modal" id="alertModal">
+        <h2>🌼 Bloom Detection Alert</h2>
+        <p>Canola flowering has been detected in Saskatchewan, Canada</p>
+        <button class="alert-btn" onclick="goToSaskatchewan()">View Data</button>
+        <button class="alert-btn secondary" onclick="closeAlert()">Close</button>
+    </div>
+
+    <div class="saskatchewan-panel" id="saskatchewanPanel">
+        <button class="panel-close-btn" onclick="closeSaskatchewanPanel()">✕</button>
+        <h3>Canada - Monitoring Regions</h3>
+        <div class="zones-grid">
+            <button class="zone-btn" onclick="loadRegion('saskatchewan')">Saskatchewan</button>
+        </div>
+    </div>
+
+    <div class="region-panel" id="regionPanel">
+        <button class="panel-close-btn" onclick="closeRegionPanel()">✕</button>
+        <h3>Saskatchewan - Cities</h3>
+        <div class="zones-grid">
+            <button class="zone-btn" onclick="loadCity('regina')">Regina</button>
+        </div>
+    </div>
+
+    <script>
+        // ========================================
+        // CONFIGURACIÓN PRINCIPAL
+        // ========================================
+        
+        // URL del backend de Earth Engine (cambiar por tu servidor)
+        const BACKEND_URL = 'http://localhost:5000';  // O tu URL de producción
+        
+        // Variable global para almacenar capas activas
+        let currentLayer = null;
+        
+        // Inicializar mapa de Leaflet
+        const map = L.map('map', {
+            zoomControl: false,
+            attributionControl: false,
+            minZoom: 2,
+            maxBounds: [[-85, -Infinity], [85, Infinity]],
+            maxBoundsViscosity: 1.0
+        }).setView([20, 0], 2);
+
+        // Capa base satelital
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 18,
+            attribution: 'Esri, DigitalGlobe, GeoEye, Earthstar Geographics, CNES/Airbus DS, USDA, USGS, AeroGRID, IGN, and the GIS User Community'
+        }).addTo(map);
+
+        // ========================================
+        // FUNCIONES DE INTERFAZ
+        // ========================================
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('overlay');
+            sidebar.classList.toggle('active');
+            overlay.classList.toggle('active');
+        }
+
+        function toggleContinent(continentId) {
+            const allLists = document.querySelectorAll('.countries-list');
+            const allButtons = document.querySelectorAll('.continent-btn');
+            const targetList = document.getElementById(continentId);
+            const targetButton = event.target;
+
+            allLists.forEach(list => {
+                if (list !== targetList) {
+                    list.classList.remove('active');
+                }
+            });
+
+            allButtons.forEach(btn => {
+                if (btn !== targetButton) {
+                    btn.classList.remove('active');
+                }
+            });
+
+            targetList.classList.toggle('active');
+            targetButton.classList.toggle('active');
+        }
+
+        function selectCountry(country) {
+            document.getElementById('saskatchewanPanel').classList.remove('active');
+            document.getElementById('regionPanel').classList.remove('active');
+            
+            if (country === 'Canada') {
+                document.getElementById('saskatchewanPanel').classList.add('active');
+                map.setView([52.9399, -106.4509], 5);
+            } else {
+                document.getElementById('constructionModal').classList.add('active');
+                document.getElementById('overlay').classList.add('active');
+            }
+        }
+
+        function goHome() {
+            map.setView([20, 0], 2);
+            document.getElementById('saskatchewanPanel').classList.remove('active');
+            document.getElementById('regionPanel').classList.remove('active');
+            document.getElementById('constructionModal').classList.remove('active');
+            document.getElementById('overlay').classList.remove('active');
+            
+            // Remover capas activas
+            if (currentLayer) {
+                map.removeLayer(currentLayer);
+                currentLayer = null;
+            }
+        }
+
+        function showAlert() {
+            document.getElementById('alertModal').classList.add('active');
+            document.getElementById('overlay').classList.add('active');
+        }
+
+        function closeAlert() {
+            document.getElementById('alertModal').classList.remove('active');
+            document.getElementById('overlay').classList.remove('active');
+        }
+
+        function goToSaskatchewan() {
+            closeAlert();
+            document.getElementById('saskatchewanPanel').classList.add('active');
+            map.setView([52.9399, -106.4509], 5);
+        }
+
+        function closeSaskatchewanPanel() {
+            document.getElementById('saskatchewanPanel').classList.remove('active');
+        }
+
+        function closeRegionPanel() {
+            document.getElementById('regionPanel').classList.remove('active');
+        }
+
+        function searchCountry(event) {
+            if (event.key === 'Enter') {
+                const searchTerm = document.getElementById('searchInput').value.toLowerCase().trim();
+                if (searchTerm === 'canada' || searchTerm === 'canadá') {
+                    selectCountry('Canada');
+                } else if (searchTerm) {
+                    selectCountry(searchTerm);
+                }
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('constructionModal').classList.remove('active');
+            document.getElementById('overlay').classList.remove('active');
+        }
+
+        function closeAll() {
+            closeModal();
+            closeAlert();
+        }
+
+        function showLoading() {
+            document.getElementById('loadingIndicator').classList.add('active');
+            document.getElementById('overlay').classList.add('active');
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingIndicator').classList.remove('active');
+            if (!document.getElementById('alertModal').classList.contains('active') &&
+                !document.getElementById('constructionModal').classList.contains('active')) {
+                document.getElementById('overlay').classList.remove('active');
+            }
+        }
+
+        // ========================================
+        // FUNCIONES DE CARGA DE DATOS GEE
+        // ========================================
+
+        function loadRegion(region) {
+            const regions = {
+                'saskatchewan': {
+                    lat: 52.9399,
+                    lng: -106.4509,
+                    zoom: 7
+                }
+            };
+
+            if (regions[region]) {
+                map.setView([regions[region].lat, regions[region].lng], regions[region].zoom);
+                
+                if (region === 'saskatchewan') {
+                    document.getElementById('saskatchewanPanel').classList.remove('active');
+                    document.getElementById('regionPanel').classList.add('active');
+                }
+            }
+        }
+
+        async function loadCity(city) {
+            const cities = {
+                'regina': {
+                    lat: 50.4452,
+                    lng: -104.6189,
+                    zoom: 11,
+                    // Coordenadas del área de estudio (puedes ajustarlas)
+                    bounds: [
+                        [-104.8, 50.2],  // [lng, lat] esquina inferior izquierda
+                        [-104.4, 50.7]   // [lng, lat] esquina superior derecha
+                    ]
+                }
+            };
+
+            if (!cities[city]) return;
+
+            // Centrar el mapa
+            map.setView([cities[city].lat, cities[city].lng], cities[city].zoom);
+            document.getElementById('regionPanel').classList.remove('active');
+
+            // Remover capa anterior si existe
+            if (currentLayer) {
+                map.removeLayer(currentLayer);
+                currentLayer = null;
+            }
+
+            try {
+                showLoading();
+                
+                // Hacer petición al backend de Python
+                const response = await fetch(`${BACKEND_URL}/get-canola-layer`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        city: city,
+                        bounds: cities[city].bounds,
+                        start_date: '2019-01-01',
+                        end_date: '2019-12-31',
+                        bloom_start: '2019-07-01',
+                        bloom_end: '2019-08-31'
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Error al obtener datos de Earth Engine');
+                }
+
+                const data = await response.json();
+                
+                // Agregar la capa de Earth Engine al mapa
+                if (data.tile_url) {
+                    currentLayer = L.tileLayer(data.tile_url, {
+                        attribution: 'Google Earth Engine - Canola Bloom Detection',
+                        maxZoom: 18,
+                        opacity: 0.8
+                    }).addTo(map);
+                    
+                    console.log('✅ Capa de GEE cargada exitosamente');
+                    
+                    // Mostrar información adicional si está disponible
+                    if (data.info) {
+                        console.log('📊 Info:', data.info);
+                    }
+                }
+
+            } catch (error) {
+                console.error('❌ Error:', error);
+                alert('⚠️ No se pudo cargar los datos de Earth Engine.\n\n' +
+                      'Verifica que:\n' +
+                      '1. El servidor backend esté corriendo\n' +
+                      '2. Las credenciales de GEE estén configuradas\n' +
+                      '3. La URL del backend sea correcta\n\n' +
+                      'Error: ' + error.message);
+            } finally {
+                hideLoading();
+            }
+        }
+    </script>
+</body>
+</html>
