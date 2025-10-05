@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BloomWatch - Global Flowering Phenology</title>
+    <title>BloomWatch</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
@@ -144,7 +144,7 @@
         }
 
         .continent-btn::after {
-            content: '▶';
+            content: '';
             transition: transform 0.3s;
             font-size: 0.8em;
             color: #4a9eff;
@@ -484,7 +484,7 @@
 </head>
 <body>
     <div class="header">
-        <div class="logo" onclick="goHome()">Beaners: <span>An Earth Observation Application for Global Flowering Phenology</span></div>
+        <div class="logo" onclick="goHome()">BloomWatch</div>
         <button class="menu-btn" onclick="toggleSidebar()">
             <span></span>
             <span></span>
@@ -494,10 +494,10 @@
 
     <div id="map"></div>
 
-    <button class="info-button" onclick="showAlert()">!</button>
+    <button class="info-button" onclick="showAlert()">i</button>
 
     <div class="loading-indicator" id="loadingIndicator">
-        <p>⏳ Loading satellite data...</p>
+        <p>Loading...</p>
     </div>
 
     <div class="overlay" id="overlay" onclick="closeAll()"></div>
@@ -509,7 +509,7 @@
         </div>
 
         <div class="search-box">
-            <input type="text" id="searchInput" placeholder="Search country..." onkeyup="searchCountry(event)">
+            <input type="text" id="searchInput" placeholder="Search..." onkeyup="searchCountry(event)">
         </div>
 
         <div class="continent-section">
@@ -583,19 +583,19 @@
 
     <div class="construction-modal" id="constructionModal">
         <h2>Region Under Development</h2>
-        <p>Bloom monitoring data for this region is currently being processed.</p>
+        <p>Data processing in progress</p>
         <button class="close-modal-btn" onclick="closeModal()">Close</button>
     </div>
 
     <div class="alert-modal" id="alertModal">
-        <h2>🌼 Bloom Detection Alert</h2>
-        <p>Canola flowering has been detected in Saskatchewan, Canada</p>
+        <h2>Detection Alert</h2>
+        <p>Canola flowering detected in Saskatchewan, Canada</p>
         <button class="alert-btn" onclick="goToSaskatchewan()">View Data</button>
         <button class="alert-btn secondary" onclick="closeAlert()">Close</button>
     </div>
 
     <div class="saskatchewan-panel" id="saskatchewanPanel">
-        <button class="panel-close-btn" onclick="closeSaskatchewanPanel()">✕</button>
+        <button class="panel-close-btn" onclick="closeSaskatchewanPanel()">x</button>
         <h3>Canada - Monitoring Regions</h3>
         <div class="zones-grid">
             <button class="zone-btn" onclick="loadRegion('saskatchewan')">Saskatchewan</button>
@@ -603,7 +603,7 @@
     </div>
 
     <div class="region-panel" id="regionPanel">
-        <button class="panel-close-btn" onclick="closeRegionPanel()">✕</button>
+        <button class="panel-close-btn" onclick="closeRegionPanel()">x</button>
         <h3>Saskatchewan - Cities</h3>
         <div class="zones-grid">
             <button class="zone-btn" onclick="loadCity('regina')">Regina</button>
@@ -611,17 +611,9 @@
     </div>
 
     <script>
-        // ========================================
-        // CONFIGURACIÓN PRINCIPAL
-        // ========================================
-        
-        // URL del backend de Earth Engine (cambiar por tu servidor)
-        const BACKEND_URL = 'http://localhost:5000';  // O tu URL de producción
-        
-        // Variable global para almacenar capas activas
+        const BACKEND_URL = 'http://localhost:5000';
         let currentLayer = null;
         
-        // Inicializar mapa de Leaflet
         const map = L.map('map', {
             zoomControl: false,
             attributionControl: false,
@@ -630,15 +622,10 @@
             maxBoundsViscosity: 1.0
         }).setView([20, 0], 2);
 
-        // Capa base satelital
         L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
             maxZoom: 18,
             attribution: 'Esri, DigitalGlobe, GeoEye, Earthstar Geographics, CNES/Airbus DS, USDA, USGS, AeroGRID, IGN, and the GIS User Community'
         }).addTo(map);
-
-        // ========================================
-        // FUNCIONES DE INTERFAZ
-        // ========================================
 
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
@@ -689,7 +676,6 @@
             document.getElementById('constructionModal').classList.remove('active');
             document.getElementById('overlay').classList.remove('active');
             
-            // Remover capas activas
             if (currentLayer) {
                 map.removeLayer(currentLayer);
                 currentLayer = null;
@@ -723,7 +709,7 @@
         function searchCountry(event) {
             if (event.key === 'Enter') {
                 const searchTerm = document.getElementById('searchInput').value.toLowerCase().trim();
-                if (searchTerm === 'canada' || searchTerm === 'canadá') {
+                if (searchTerm === 'canada') {
                     selectCountry('Canada');
                 } else if (searchTerm) {
                     selectCountry(searchTerm);
@@ -754,10 +740,6 @@
             }
         }
 
-        // ========================================
-        // FUNCIONES DE CARGA DE DATOS GEE
-        // ========================================
-
         function loadRegion(region) {
             const regions = {
                 'saskatchewan': {
@@ -783,21 +765,18 @@
                     lat: 50.4452,
                     lng: -104.6189,
                     zoom: 11,
-                    // Coordenadas del área de estudio (puedes ajustarlas)
                     bounds: [
-                        [-104.8, 50.2],  // [lng, lat] esquina inferior izquierda
-                        [-104.4, 50.7]   // [lng, lat] esquina superior derecha
+                        [-104.8, 50.2],
+                        [-104.4, 50.7]
                     ]
                 }
             };
 
             if (!cities[city]) return;
 
-            // Centrar el mapa
             map.setView([cities[city].lat, cities[city].lng], cities[city].zoom);
             document.getElementById('regionPanel').classList.remove('active');
 
-            // Remover capa anterior si existe
             if (currentLayer) {
                 map.removeLayer(currentLayer);
                 currentLayer = null;
@@ -806,7 +785,6 @@
             try {
                 showLoading();
                 
-                // Hacer petición al backend de Python
                 const response = await fetch(`${BACKEND_URL}/get-canola-layer`, {
                     method: 'POST',
                     headers: {
@@ -823,35 +801,28 @@
                 });
 
                 if (!response.ok) {
-                    throw new Error('Error al obtener datos de Earth Engine');
+                    throw new Error('Error fetching Earth Engine data');
                 }
 
                 const data = await response.json();
                 
-                // Agregar la capa de Earth Engine al mapa
                 if (data.tile_url) {
                     currentLayer = L.tileLayer(data.tile_url, {
-                        attribution: 'Google Earth Engine - Canola Bloom Detection',
+                        attribution: 'Google Earth Engine',
                         maxZoom: 18,
                         opacity: 0.8
                     }).addTo(map);
                     
-                    console.log('✅ Capa de GEE cargada exitosamente');
+                    console.log('Layer loaded');
                     
-                    // Mostrar información adicional si está disponible
                     if (data.info) {
-                        console.log('📊 Info:', data.info);
+                        console.log('Info:', data.info);
                     }
                 }
 
             } catch (error) {
-                console.error('❌ Error:', error);
-                alert('⚠️ No se pudo cargar los datos de Earth Engine.\n\n' +
-                      'Verifica que:\n' +
-                      '1. El servidor backend esté corriendo\n' +
-                      '2. Las credenciales de GEE estén configuradas\n' +
-                      '3. La URL del backend sea correcta\n\n' +
-                      'Error: ' + error.message);
+                console.error('Error:', error);
+                alert('Unable to load Earth Engine data. Check backend configuration.');
             } finally {
                 hideLoading();
             }
